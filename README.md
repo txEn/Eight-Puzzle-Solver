@@ -11,7 +11,8 @@ A*     - 5
 
 ##Input
 Input is initial state followed by final state, followed by type of search you want to use.  
-For optimal and complete results use A*.
+For optimal and complete results use A*.  
+Only meant for 3x3 puzzle boards.
 
 ###Example
 1 2 3  
