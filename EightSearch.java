@@ -6,8 +6,6 @@ class Child implements Comparable<Child>{
     public String seq;
     public int depth;
     public int heuristic;
-
-
     public String action;
     public Child parent;
 
@@ -203,16 +201,13 @@ public class EightSearch{
 	    while(frontier.size() > 0){    
 		current = frontier.remove(0);
 		MakeDescendants(current, func);
-	        
 		insert(func);			
-
 		if(running == false){
 		    desc.clear();
 		    visited.clear();
 		    frontier.clear();
 		    return;
 		}
- 
 	    }
        
 	}catch(OutOfMemoryError e){
