@@ -1,21 +1,27 @@
 import java.util.*;
 import java.lang.Math;
-import java.nio.charset.StandardCharsets;
- 
+
 class Child implements Comparable<Child>{
  
     public String seq;
-    public String path;
+    public int depth;
     public int heuristic;
- 
-    Child(String seq, String path){
+
+
+    public String action;
+    public Child parent;
+
+
+    Child(String seq, String action, Child parent){
 	this.seq = seq;
-	this.path = path;
+	this.action = action;
+	this.parent = parent;
+	this.depth = -1;
 	this.heuristic = 0;
     }
    
     public void setHeuristic(int sumDist){
-	this.heuristic = sumDist + path.length();
+	this.heuristic = sumDist + depth;
     }
     public void setGreedyHeuristic(int sumDist){
 	this.heuristic = sumDist;
@@ -45,22 +51,14 @@ public class EightSearch{
     public static long timeEnd;
     public static long totalTime;
    
-    public static LinkedList<String>     frontier;    
+    public static LinkedList<Child>     frontier;    
     public static ArrayList<Child>           desc;    
-    public static HashMap<String, byte[]> visited;
+    public static HashMap<String, Integer> visited;
     public static PriorityQueue<Child>      pqueue;
-   
+
+    public static int nrBT;
+    
     public static boolean running;
-   
- 
-    public static String byte2str(byte[] bytes){
-	String string = new String(bytes, StandardCharsets.UTF_8);
-	return string;
-    }
-    public static byte[] str2byte(String string){
-	byte[] bytes = string.getBytes(StandardCharsets.UTF_8);
-	return bytes;
-    }
    
     public static String makeSequence(int[][] matriz){
 	int seq = 0;
@@ -121,22 +119,7 @@ public class EightSearch{
 	return false;
    
     }
-    public static void printMat(String seq){
- 
-	int k=0;
-   
-	for(int i=1; i<=9; i++){      
-	    System.out.print(seq.charAt(i-1)+" ");
-	    if(i == 6){
-		System.out.print("Path Length = "+byte2str(visited.get(seq)).length());
-	    }
-	    if(i % 3 == 0){
-		System.out.println();
-	    }
-	}
-	System.out.println();
-    }
- 
+
     public static int calcDist(String seq){
 	//retornar distancias verticais + horizontais de todas as posiçoes de 1 a 8 somadas
 	int sum   = 0;
@@ -179,8 +162,9 @@ public class EightSearch{
  
 	pqueue = new PriorityQueue<Child>();
    
-	Child current = new Child(start, "");
-   
+	Child current = new Child(start, "", null);
+	current.depth = 1;
+
 	int sumDist = calcDist(current.seq);
 	if(func == 5)
 	    current.setHeuristic(sumDist);
@@ -188,13 +172,12 @@ public class EightSearch{
 	    current.setGreedyHeuristic(sumDist);
    
 	pqueue.add(current);
-	visited.put(current.seq, str2byte(current.path));
+	visited.put(current.seq, current.depth);
  
 	while(pqueue.size() > 0){
 	    current = pqueue.poll();
-	    MakeDescendants(current.seq, func);
+	    MakeDescendants(current, func);
 	    insert(func);
-	    desc.clear();
 	    if(running == false){
 		desc.clear();
 		visited.clear();
@@ -210,16 +193,19 @@ public class EightSearch{
 	    h_search(func);
 	    return;
 	}
- 
-	String current = null;
-	frontier.add(start);
-	visited.put(start, str2byte(new String("")));
+	nrBT = 0;
+	Child current = null;
+	Child top = new Child(start, "", null);
+	top.depth = 0;
+	frontier.add(top);
+	visited.put(start, 0);
 	try{
 	    while(frontier.size() > 0){    
 		current = frontier.remove(0);
-		MakeDescendants(current, func);    
-		insert(func);
-		desc.clear();
+		MakeDescendants(current, func);
+	        
+		insert(func);			
+
 		if(running == false){
 		    desc.clear();
 		    visited.clear();
@@ -241,16 +227,30 @@ public class EightSearch{
 	}
  
     }
- 
-    public static void printSolution(String seq, int func){
-   
+
+    public static String getPath(Child node){
+
+	String path = "";
+	
+	while(node.parent != null){
+	    path = node.action+path;
+	    node = node.parent;
+	}
+	
+	return path;
+    }
+    
+    public static void printSolution(Child node, int func){
+
+	String path = getPath(node);
 	timeEnd = System.currentTimeMillis();
 	totalTime = timeEnd - timeStart;
    
 	System.out.println("Solution Found");
-	System.out.println("Steps: "+byte2str(visited.get(seq)));
-	System.out.println("Number of steps: "+byte2str(visited.get(seq)).length());
+	System.out.println("Steps: "+path);
+	System.out.println("Number of steps: "+path.length());
 	System.out.println("Execution time: "+(double)(totalTime*0.001)+" seconds");
+	System.out.println("nr of backtracks = "+nrBT);
    
 	if(func == 5 || func == 4){
 	    System.out.println("Number of nodes in memory: HashMap = "+visited.size()+ " PriorityQueue = "+pqueue.size());
@@ -287,172 +287,169 @@ public class EightSearch{
 	}
 	return _seq.toString();
     }
-   
-    public static void MakeDescendants(String sequence, int func){
+    
+    public static void MakeDescendants(Child node, int func){
  
 	int z            = -1; //zero index
 	String temp      = "";
 	String direction = "";
    
         for(int i=0; i<9; i++){
-	    if(sequence.charAt(i) == '0'){
+	    if(node.seq.charAt(i) == '0'){
 		z = i;
 	    }
 	}
-   
-	if(byte2str(visited.get(sequence)).length() > level && func == 3){
-	    backtrack(sequence, z);    
+	if(func == 3 && node.depth > level){
+	    backtrack(node, z);    
 	    return;
 	}
    
 	if(z > 2){
 	    //pode ir para cima
-	    temp = sequence;
-	    direction = byte2str(visited.get(sequence))+"U";
+	    temp = node.seq;
+	    direction = "U";
 	    temp = move("U", temp, z);
 	    //verificar aqui se ja foi visitado
 	    //verificar profundidade
-	    if(!isVisited(temp) || (func == 3 && byte2str(visited.get(temp)).length() > direction.length())){
-		desc.add(new Child(temp, direction));      
+	    if(!isVisited(temp) || (func == 3 && visited.get(temp) > visited.get(node.seq)+1)){
+		desc.add(new Child(temp, direction, node));
+		if(func == 2 || func == 3){
+		    return;
+		}
 	    }
 	}
    
    
 	if(z < 6){
 	    //pode ir para baixo
-	    temp = sequence;
-	    direction = byte2str(visited.get(sequence))+"D";
+	    temp = node.seq;
+	    direction = "D";
 	    temp = move("D", temp, z);
 	    //verificar aqui se ja foi visitado    
-	    if(!isVisited(temp) || (func == 3 && byte2str(visited.get(temp)).length() > direction.length())){
-		desc.add(new Child(temp, direction));
+	    if(!isVisited(temp) || (func == 3 && visited.get(temp) > visited.get(node.seq)+1)){
+		desc.add(new Child(temp, direction, node));
+		if(func == 2 || func == 3){
+		    return;
+		}
 	    }  
 	}
    
    
 	if(z != 0 && z != 3 && z != 6){
 	    //pode ir para esquerda
-	    temp = sequence;
-	    direction = byte2str(visited.get(sequence))+"L";
+	    temp = node.seq;
+	    direction = "L";
 	    temp = move("L", temp, z);
 	    //verificar aqui se ja foi visitado    
-	    if(!isVisited(temp) || (func == 3 && byte2str(visited.get(temp)).length() > direction.length())){
-		desc.add(new Child(temp, direction));
+	    if(!isVisited(temp) || (func == 3 && visited.get(temp) > visited.get(node.seq)+1)){
+		desc.add(new Child(temp, direction, node));
+		if(func == 2 || func == 3){
+		    return;
+		}
 	    }
        
 	}
    
 	if(z != 2 && z != 5 && z != 8){
 	    //pode ir para direita
-	    temp = sequence;
-	    direction = byte2str(visited.get(sequence))+"R";
+	    temp = node.seq;
+	    direction = "R";
 	    temp = move("R", temp, z);
 	    //verificar aqui se ja foi visitado    
-	    if(!isVisited(temp) || (func == 3 && byte2str(visited.get(temp)).length() > direction.length())){
-		desc.add(new Child(temp, direction));
+	    if(!isVisited(temp) || (func == 3 && visited.get(temp) > visited.get(node.seq)+1)){
+		desc.add(new Child(temp, direction, node));
+		if(func == 2 || func == 3){
+		    return;
+		}
 	    }
  
 	}
-   
-	//BACKTRACKING DFS / DFS-I
-	if(desc.size() == 0 && (func == 2 || func == 3) && !(byte2str(visited.get(sequence)).equals(""))){
-       
-	    //adicionar ao stack frontier um nó igual ao nó na posição anterior
-	    //sequence = sequencia do actual deadend
-	    backtrack(sequence, z);
-	    desc.clear();
+	if(func == 2 || func == 3){
+	    conditionCheck(node, z, func);
 	}
-   
-	if(desc.size() == 0 && func == 3 && byte2str(visited.get(sequence)).equals("")){
+       
+    }
+
+    public static void conditionCheck(Child node, int z, int func){
+	
+	if(desc.size() == 0 && !(node.depth == 0)){
+	    backtrack(node, z);
+	}
+	
+	if(desc.size() == 0 && func == 3 && node.depth == 0){
 	    level++;
 	    desc.clear();
 	    visited.clear();
 	    frontier.clear();
 	    return;
 	}
- 
-	if(desc.size() == 0 && func == 2 && byte2str(visited.get(sequence)).equals("")){
+	if(desc.size() == 0 && func == 2 && node.depth == 0){
 	    running = false;
 	    desc.clear();
 	    visited.clear();
 	    pqueue.clear();
 	    return;
 	}
-       
+ 
     }
  
-    public static void backtrack(String sequence, int z){
-        String path = byte2str(visited.get(sequence));      //caminho atual
-        char back   = path.charAt(path.length()-1);         //ação anterior
-        String sub  = path.substring(0, path.length()-1);   //caminho anterior
-        String temp = "";
-       
-        if(back == 'U'){
-	    temp = sequence;
-	    temp = move("D", temp, z);
-	    frontier.addFirst(temp);
-        }else if(back == 'D'){
-	    temp = sequence;
-	    temp = move("U", temp, z);
-	    frontier.addFirst(temp);
-        }else if(back == 'L'){
-	    temp = sequence;
-	    temp = move("R", temp, z);
-	    frontier.addFirst(temp);
-        }else if(back == 'R'){
-	    temp = sequence;
-	    temp = move("L", temp, z);
-	    frontier.addFirst(temp);
-        }
-       
+    public static void backtrack(Child node, int z){
+	
+	nrBT++;
+	frontier.add(node.parent);
+	
     }
-   
+      
     public static void insert(int func){
  
 	//BFS
 	if(func == 1){
 	    while(desc.size() > 0){
 		Child child = desc.remove(0);
-		visited.put(child.seq, str2byte(child.path));      
+		child.depth = child.parent.depth+1;
+		visited.put(child.seq, child.depth);      
 		if(isSolution(child.seq)){
-		    printSolution(child.seq, func);
+		    printSolution(child, func);
 		    return;
 		}
-		frontier.addLast(child.seq);      
+		frontier.addLast(child);      
 	    }
 	}
 	//DFS
 	else if(func == 2){
 	    if(desc.size() > 0){
-		Child child = desc.remove(desc.size()-1);
-		visited.put(child.seq, str2byte(child.path));
+		Child child = desc.remove(0);
+		child.depth = child.parent.depth+1;
+		visited.put(child.seq, child.depth);
 		if(isSolution(child.seq)){
-		    printSolution(child.seq, func);
+		    printSolution(child, func);
 		    return;
 		}
-		frontier.addFirst(child.seq);
-	    }      
+		frontier.addFirst(child);
+	    }
 	}
 	//Iterative Deepening DFS
 	else if(func == 3){    
 	    if(desc.size() > 0){
-		Child child = desc.remove(desc.size()-1);
-		visited.put(child.seq, str2byte(child.path));      
+		Child child = desc.remove(0);
+		child.depth = child.parent.depth + 1;
+		visited.put(child.seq, child.depth);      
 		if(isSolution(child.seq)){
-		    printSolution(child.seq, func);
+		    printSolution(child, func);
 		    return;
 		}
-		frontier.addFirst(child.seq);          
+		frontier.addFirst(child);          
 	    }
 	}
 	//Greedy Search
 	else if(func == 4){
 	    while(desc.size() > 0){
 		Child child = desc.remove(0);
+		child.depth = child.parent.depth + 1;
 		child.setGreedyHeuristic(calcDist(child.seq));
-		visited.put(child.seq, str2byte(child.path));      
+		visited.put(child.seq, child.depth);      
 		if(isSolution(child.seq)){
-		    printSolution(child.seq, func);
+		    printSolution(child, func);
 		    return;
 		}
 		pqueue.add(child);    
@@ -462,10 +459,11 @@ public class EightSearch{
 	else if(func == 5){
 	    while(desc.size() > 0){
 		Child child = desc.remove(0);
+		child.depth = child.parent.depth + 1;
 		child.setHeuristic(calcDist(child.seq));
-		visited.put(child.seq, str2byte(child.path));      
+		visited.put(child.seq, child.depth);      
 		if(isSolution(child.seq)){
-		    printSolution(child.seq, func);
+		    printSolution(child, func);
 		    return;
 		}
 		pqueue.add(child);    
@@ -476,9 +474,9 @@ public class EightSearch{
  
     public static void main(String args[]){
    
-	frontier    = new LinkedList<String>();
+	frontier    = new LinkedList<Child>();
 	desc        = new ArrayList<Child>();
-	visited     = new HashMap<String,byte[]>();
+	visited     = new HashMap<String,Integer>();
  
 	running     = true;
 	level       = 0;
